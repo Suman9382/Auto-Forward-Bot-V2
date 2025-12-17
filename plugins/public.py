@@ -42,7 +42,21 @@ async def run(bot, message):
     if fromid.text and fromid.text.startswith('/'):
         await message.reply(Translation.CANCEL)
         return 
-    if fromid.text and not fromid.forward_date:
+
+    # Handle "Saved Messages" input
+    if fromid.text and fromid.text.lower() in ["me", "saved"]:
+        chat_id = "me"
+        limit_msg = await bot.ask(message.chat.id, Translation.SAVED_MSG_LIMIT)
+        if limit_msg.text.startswith('/'):
+             await message.reply(Translation.CANCEL)
+             return
+        if not limit_msg.text.isdigit():
+             await message.reply("Invalid number.")
+             return
+        last_msg_id = int(limit_msg.text) # Using last_msg_id as limit/count
+        title = "Saved Messages"
+
+    elif fromid.text and not fromid.forward_date:
         regex = re.compile(r"(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
         match = regex.match(fromid.text.replace("?single", ""))
         if not match:
@@ -59,16 +73,19 @@ async def run(bot, message):
     else:
         await message.reply_text("**invalid !**")
         return 
-    try:
-        title = (await bot.get_chat(chat_id)).title
-  #  except ChannelInvalid:
-        #return await fromid.reply("**Given source chat is copyrighted channel/group. you can't forward messages from there**")
-    except (PrivateChat, ChannelPrivate, ChannelInvalid):
-        title = "private" if fromid.text else fromid.forward_from_chat.title
-    except (UsernameInvalid, UsernameNotModified):
-        return await message.reply('Invalid Link specified.')
-    except Exception as e:
-        return await message.reply(f'Errors - {e}')
+
+    if chat_id != "me":
+        try:
+            title = (await bot.get_chat(chat_id)).title
+      #  except ChannelInvalid:
+            #return await fromid.reply("**Given source chat is copyrighted channel/group. you can't forward messages from there**")
+        except (PrivateChat, ChannelPrivate, ChannelInvalid):
+            title = "private" if fromid.text else fromid.forward_from_chat.title
+        except (UsernameInvalid, UsernameNotModified):
+            return await message.reply('Invalid Link specified.')
+        except Exception as e:
+            return await message.reply(f'Errors - {e}')
+
     skipno = await bot.ask(message.chat.id, Translation.SKIP_MSG)
     if skipno.text.startswith('/'):
         await message.reply(Translation.CANCEL)
