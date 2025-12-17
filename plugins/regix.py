@@ -43,7 +43,8 @@ async def pub_(bot, message):
       return await m.edit(e)
     await msg_edit(m, "<code>processing..</code>")
     try: 
-       await client.get_messages(sts.get("FROM"), sts.get("limit"))
+       # Just check if we can access messages. If continuous, limit might be huge.
+       await client.get_messages(sts.get("FROM"), 1)
     except:
        await msg_edit(m, f"**Source chat may be a private channel / group. Use userbot (user must be member over there) or  if Make Your [Bot](t.me/{_bot['username']}) an admin over there**", retry_btn(frwd_id), True)
        return await stop(client, user)
@@ -67,11 +68,16 @@ async def pub_(bot, message):
           pling=0
           await edit(m, 'Progressing', 10, sts)
           print(f"Starting Forwarding Process... From :{sts.get('FROM')} To: {sts.get('TO')} Totel: {sts.get('limit')} stats : {sts.get('skip')})")
+
+          # Use getattr to safely check for 'continuous' attribute since old STS objects might not have it
+          is_continuous = getattr(sts, 'continuous', False)
+
           async for message in client.iter_messages(
             client,
             chat_id=sts.get('FROM'), 
             limit=int(sts.get('limit')), 
-            offset=int(sts.get('skip')) if sts.get('skip') else 0
+            offset=int(sts.get('skip')) if sts.get('skip') else 0,
+            continuous=is_continuous
             ):
                 if await is_cancelled(client, user, m, sts):
                    return
@@ -136,7 +142,8 @@ async def copy(bot, msg, m, sts):
      await edit(m, 'Progressing', 10, sts)
      await copy(bot, msg, m, sts)
    except Exception as e:
-     print(e)
+     # Improved error logging to debug "Not Forwarding" issues
+     print(f"Failed to copy message {msg.get('msg_id')}: {e}")
      sts.add('deleted')
         
 async def forward(bot, msg, m, sts, protect):
@@ -151,6 +158,9 @@ async def forward(bot, msg, m, sts, protect):
      await asyncio.sleep(e.value)
      await edit(m, 'Progressing', 10, sts)
      await forward(bot, msg, m, sts, protect)
+   except Exception as e:
+      print(f"Failed to forward messages {msg}: {e}")
+      sts.add('deleted')
 
 PROGRESS = """
 📈 Percetage: {0} %
@@ -179,7 +189,9 @@ async def msg_edit(msg, text, button=None, wait=None):
 async def edit(msg, title, status, sts):
    i = sts.get(full=True)
    status = 'Forwarding' if status == 10 else f"Sleeping {status} s" if str(status).isnumeric() else status
-   percentage = "{:.0f}".format(float(i.fetched)*100/float(i.total))
+   # Handle division by zero if total is 0 (which happens if infinite/continuous without known total)
+   total = float(i.total) if float(i.total) > 0 else 1.0
+   percentage = "{:.0f}".format(float(i.fetched)*100/total)
    
    now = time.time()
    diff = int(now - i.start)

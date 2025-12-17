@@ -12,9 +12,9 @@ class STS:
     def verify(self):
         return self.data.get(self.id)
     
-    def store(self, From, to,  skip, limit):
+    def store(self, From, to,  skip, limit, continuous=False):
         self.data[self.id] = {"FROM": From, 'TO': to, 'total_files': 0, 'skip': skip, 'limit': limit,
-                      'fetched': skip, 'filtered': 0, 'deleted': 0, 'duplicate': 0, 'total': limit, 'start': 0}
+                      'fetched': skip, 'filtered': 0, 'deleted': 0, 'duplicate': 0, 'total': limit, 'start': 0, 'continuous': continuous}
         self.get(full=True)
         return STS(self.id)
         
@@ -48,4 +48,3 @@ class STS:
             size = [configs['file_size'], configs['size_limit']]
         return bot, configs['caption'], configs['forward_tag'], {'chat_id': k.FROM, 'limit': k.limit, 'offset': k.skip, 'filters': filters,
                 'keywords': configs['keywords'], 'media_size': size, 'extensions': configs['extension'], 'skip_duplicate': duplicate}, configs['protect'], button
-        

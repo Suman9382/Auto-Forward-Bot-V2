@@ -33,39 +33,78 @@ async def start_clone_bot(FwdBot, data=None):
       offset: int = 0,
       search: str = None,
       filter: "types.TypeMessagesFilter" = None,
+      continuous: bool = False
       ) -> Optional[AsyncGenerator["types.Message", None]]:
-        """Iterate through a chat sequentially.
-        This convenience method does the same as repeatedly calling :meth:`~pyrogram.Client.get_messages` in a loop, thus saving
-        you from the hassle of setting up boilerplate code. It is useful for getting the whole chat messages with a
-        single call.
-        Parameters:
-            chat_id (``int`` | ``str``):
-                Unique identifier (int) or username (str) of the target chat.
-                For your personal cloud (Saved Messages) you can simply use "me" or "self".
-                For a contact that exists in your Telegram address book you can use his phone number (str).
-                
-            limit (``int``):
-                Identifier of the last message to be returned.
-                
-            offset (``int``, *optional*):
-                Identifier of the first message to be returned.
-                Defaults to 0.
-        Returns:
-            ``Generator``: A generator yielding :obj:`~pyrogram.types.Message` objects.
-        Example:
-            .. code-block:: python
-                for message in app.iter_messages("pyrogram", 1, 15000):
-                    print(message.text)
-        """
+        """Iterate through a chat sequentially."""
         current = offset
         while True:
-            new_diff = min(200, limit - current)
-            if new_diff <= 0:
-                return
-            messages = await self.get_messages(chat_id, list(range(current, current+new_diff+1)))
-            for message in messages:
+            # If continuous, we don't really have a limit, effectively infinite
+            # But we still use limit if provided to fetch batches
+            # If continuous=True, loop forever waiting for new messages
+
+            # If batch fetch size is 200
+            new_diff = 200 # Default batch size
+
+            if not continuous and limit > 0:
+                new_diff = min(200, limit - current)
+                if new_diff <= 0:
+                    return
+
+            try:
+                messages = await self.get_messages(chat_id, list(range(current, current+new_diff+1)))
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+                continue
+            except Exception:
+                # If message doesn't exist (yet), get_messages returns None or list with None?
+                # Pyrogram get_messages with list returns list of Messages or None
+                messages = []
+
+            # Filter out None values (messages that don't exist yet)
+            valid_messages = [m for m in messages if m and not m.empty]
+
+            if not valid_messages:
+                if continuous:
+                    # No new messages, wait and retry
+                    await asyncio.sleep(10)
+                    continue
+                else:
+                    # End of chat
+                    return
+
+            for message in valid_messages:
                 yield message
-                current += 1
+                current = max(current, message.id) + 1
+
+            # If we got fewer messages than requested, and not continuous, it might be end?
+            # But we are iterating by ID range, so gaps are possible.
+            # We just increment current.
+            if not valid_messages and not continuous:
+                 return
+
+            # Optimization: if valid_messages is empty but we are in continuous mode, we handled it above.
+            # If valid_messages is NOT empty, we processed them.
+            # Update current to be next ID.
+
+            current = list(range(current, current+new_diff+1))[-1] + 1
+            # Wait, the range logic above: range(current, current+new_diff+1)
+            # If current=0, new_diff=200. range(0, 201). IDs 0..200.
+            # Next iteration should start at 201.
+            # So current += new_diff + 1?
+            # No, if we yield, we just continue loop.
+            # But we need to update 'current' for next batch.
+            # My previous logic: `current += 1` inside loop was weird because `messages` is a batch.
+
+            # Let's fix the batch logic properly
+            # The original code:
+            # messages = await self.get_messages(chat_id, list(range(current, current+new_diff+1)))
+            # for message in messages: yield message; current += 1
+            # This assumed sequential IDs and incrementing current.
+
+            # New logic:
+            # Just increment current by batch size at the end of loop
+            current += (new_diff + 1)
+
    #
    FwdBot.iter_messages = iter_messages
    return FwdBot

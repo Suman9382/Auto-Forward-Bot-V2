@@ -43,21 +43,44 @@ async def run(bot, message):
         await message.reply(Translation.CANCEL)
         return 
 
+    continuous = False
+
     # Handle "Saved Messages" input
     if fromid.text and fromid.text.lower() in ["me", "saved"]:
         if _bot.get('is_bot'):
             return await message.reply("<b>You cannot forward from Saved Messages using a Bot. Please add a Userbot session via /settings to use this feature.</b>")
 
         chat_id = "me"
-        limit_msg = await bot.ask(message.chat.id, Translation.SAVED_MSG_LIMIT)
-        if limit_msg.text.startswith('/'):
+        title = "Saved Messages"
+
+        # Ask for mode: Batch vs Live
+        mode_msg = await bot.ask(message.chat.id, Translation.SAVED_MSG_MODE)
+        if mode_msg.text.startswith('/'):
              await message.reply(Translation.CANCEL)
              return
-        if not limit_msg.text.isdigit():
-             await message.reply("Invalid number.")
-             return
-        last_msg_id = int(limit_msg.text) # Using last_msg_id as limit/count
-        title = "Saved Messages"
+
+        if "live" in mode_msg.text.lower() or "2" in mode_msg.text:
+            continuous = True
+            last_msg_id = 1000000 # Just a high number, but loop will be infinite/wait
+        else:
+            limit_msg = await bot.ask(message.chat.id, Translation.SAVED_MSG_LIMIT)
+            if limit_msg.text.startswith('/'):
+                 await message.reply(Translation.CANCEL)
+                 return
+
+            if limit_msg.text.lower() == "all":
+                 last_msg_id = 0 # 0 usually means no limit in some contexts, but let's use a very high number if iter logic relies on it?
+                 # iter_messages: if limit > 0, it iterates until limit.
+                 # If we want ALL, we should use a high number or verify how 0 is handled.
+                 # In test.py: new_diff = min(200, limit - current).
+                 # If limit is 0, 0-0 = 0. new_diff <= 0. Return.
+                 # So we need a high number.
+                 last_msg_id = 10000000
+            elif not limit_msg.text.isdigit():
+                 await message.reply("Invalid number.")
+                 return
+            else:
+                 last_msg_id = int(limit_msg.text) # Using last_msg_id as limit/count
 
     elif fromid.text and not fromid.forward_date:
         regex = re.compile(r"(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
@@ -104,4 +127,4 @@ async def run(bot, message):
         disable_web_page_preview=True,
         reply_markup=reply_markup
     )
-    STS(forward_id).store(chat_id, toid, int(skipno.text), int(last_msg_id))
+    STS(forward_id).store(chat_id, toid, int(skipno.text), int(last_msg_id), continuous=continuous)
