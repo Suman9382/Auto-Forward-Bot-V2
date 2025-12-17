@@ -45,6 +45,9 @@ async def run(bot, message):
 
     # Handle "Saved Messages" input
     if fromid.text and fromid.text.lower() in ["me", "saved"]:
+        if _bot.get('is_bot'):
+            return await message.reply("<b>You cannot forward from Saved Messages using a Bot. Please add a Userbot session via /settings to use this feature.</b>")
+
         chat_id = "me"
         limit_msg = await bot.ask(message.chat.id, Translation.SAVED_MSG_LIMIT)
         if limit_msg.text.startswith('/'):
