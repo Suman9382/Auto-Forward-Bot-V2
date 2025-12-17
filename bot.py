@@ -36,25 +36,34 @@ class Bot(Client):
         self.set_parse_mode(ParseMode.DEFAULT)
         text = "**๏[-ิ_•ิ]๏ bot restarted !**"
         logging.info(text)
-        success = failed = 0
-        users = await db.get_all_frwd()
-        async for user in users:
-           chat_id = user['user_id']
-           try:
-              await self.send_message(chat_id, text)
-              success += 1
-           except FloodWait as e:
-              await asyncio.sleep(e.value + 1)
-              await self.send_message(chat_id, text)
-              success += 1
-           except Exception:
-              failed += 1 
-    #    await self.send_message("venombotsupport", text)
-        if (success + failed) != 0:
-           await db.rmve_frwd(all=True)
-           logging.info(f"Restart message status"
-                 f"success: {success}"
-                 f"failed: {failed}")
+
+        # Check if database URI is default broken one
+        if "mongodb+srv://chhjgjkkjhkjhkjh@cluster0.xowzpr4.mongodb.net/" in Config.DATABASE_URI:
+             logging.error("You have not set the DATABASE environment variable. The bot will not function correctly.")
+             return
+
+        try:
+            success = failed = 0
+            users = await db.get_all_frwd()
+            async for user in users:
+               chat_id = user['user_id']
+               try:
+                  await self.send_message(chat_id, text)
+                  success += 1
+               except FloodWait as e:
+                  await asyncio.sleep(e.value + 1)
+                  await self.send_message(chat_id, text)
+                  success += 1
+               except Exception:
+                  failed += 1
+
+            if (success + failed) != 0:
+               await db.rmve_frwd(all=True)
+               logging.info(f"Restart message status"
+                     f"success: {success}"
+                     f"failed: {failed}")
+        except Exception as e:
+            logging.error(f"Failed to send restart messages or connect to DB: {e}")
 
     async def stop(self, *args):
         msg = f"@{self.username} stopped. Bye."
