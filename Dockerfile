@@ -1,12 +1,25 @@
-FROM python:3.8-slim-buster
+FROM python:3.10-slim
 
-RUN apt update && apt upgrade -y
-RUN apt install git -y
-COPY requirements.txt /requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN cd /
-RUN pip3 install -U pip && pip3 install -U -r requirements.txt
-RUN mkdir /fwdbot
-WORKDIR /fwdbot
-COPY start.sh /start.sh
-CMD ["/bin/bash", "/start.sh"] 
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -U pip && \
+    pip3 install --no-cache-dir -U -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Command to run the bot
+CMD ["python3", "main.py"]
