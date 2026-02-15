@@ -28,6 +28,10 @@ Advance Telegram Bot that can work as Message/Files Forwarder from Restricted or
      python main.py
      ```
 
+### Render Deployment
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
 ### Heroku Deployment
 
 1. **Setup on Heroku**:
